@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	if (hflag)
 	{
 		print_usage();
-		return hflag;
+		exit(EX_USAGE);
 	}
 
 	/* If flag sequence was invalid (invalid flag or duplicate flags) then exit */
@@ -203,15 +203,6 @@ int main(int argc, char *argv[])
 	encdec_file(infile, outfile, password, eflag);
 	free(password);
 
-	/*
-	 * This is how you encrypt an input char* buffer "from", of length "len"
-	 * onto output buffer "to", using key "key".  Jyst pass "iv" and "&n" as
-	 * shown, and don't forget to actually tell the function to BF_ENCRYPT.
-	 */
-	//BF_cfb64_encrypt(from, to, len, &key, iv, &n, BF_ENCRYPT);
-
-	/* Decrypting is the same: just pass BF_DECRYPT instead */
-	//BF_cfb64_encrypt(from, to, len, &key, iv, &n, BF_DECRYPT);
 	exit(0);
 }
 
