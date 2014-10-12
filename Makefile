@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Werror -O2 -g
+CFLAGS = -Wall -Werror -O2
 
 OBJS = cipher.o bf_skey.o bf_enc.o bf_cfb64.o
 
