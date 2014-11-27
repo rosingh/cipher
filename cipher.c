@@ -11,7 +11,7 @@
 #include <sys/statvfs.h>
 
 void print_usage(void);
-void check_files(const char *infile, const char *outfile);
+void check_files(const char *infile, const int infile_des, const char *outfile, const int outfile_des);
 void open_files(const char *infile, const char *outfile, int *infile_des, int *outfile_des);
 void encdec_file(const char *infile, const char *outfile, char *password, const int enc_flag);
 void close_file(const char *file, int file_des);
@@ -150,7 +150,6 @@ int main(int argc, char *argv[])
 
 	infile = argv[optind];
 	outfile = argv[optind + 1];
-	check_files(infile, outfile);
 
 	/* If a password wasn't supplied as an argument, get it now */
 	if (!pflag)
@@ -203,7 +202,7 @@ int main(int argc, char *argv[])
 	encdec_file(infile, outfile, password, eflag);
 	free(password);
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 /*
@@ -220,13 +219,13 @@ void print_usage(void)
  * infile - name for the input file, "-" for stdin
  * outfile - name for the output file, "-" for stdout
  */
-void check_files(const char *infile, const char *outfile)
+void check_files(const char *infile, const int infile_des, const char *outfile, const int outfile_des)
 {
 	struct stat infile_stat;
 	struct stat outfile_stat;
 
-	int istat = stat(infile, &infile_stat);
-	int ostat = stat(outfile, &outfile_stat);
+	int istat = fstat(infile_des, &infile_stat);
+	int ostat = fstat(outfile_des, &outfile_stat);
 
 
 	/* Only go through file checks if infile is not set to stdin */
@@ -236,6 +235,8 @@ void check_files(const char *infile, const char *outfile)
 		if (istat == -1)
 		{
 			perror(infile);
+			close_file(infile, infile_des);
+			close_file(outfile, outfile_des);
 			exit(EX_NOINPUT);
 		}
 
@@ -244,23 +245,19 @@ void check_files(const char *infile, const char *outfile)
 		{
 			if (S_ISDIR(infile_stat.st_mode))
 			{
-				fprintf(stderr, "%s: is a directory\n", infile);
+				fprintf(stderr, "%s is a directory\n", infile);
+				close_file(infile, infile_des);
+				close_file(outfile, outfile_des);
 				exit(EX_USAGE);
 			}
 			else
 			{
-				fprintf(stderr, "%s: is a block or character special\n", infile);
+				fprintf(stderr, "%s is a block or character special\n", infile);
+				close_file(infile, infile_des);
+				close_file(outfile, outfile_des);
 				exit(EX_USAGE);
 			}
 		}
-
-		/* Don't have read permissions to infile so exit */
-		if ((infile_stat.st_mode & S_IRUSR) != S_IRUSR)
-		{
-			fprintf(stderr, "%s: Permission denied\n", infile);
-			exit(EX_NOINPUT);
-		}
-
 	}
 
 	/* Only go through file checks if outfile is not set to stdout */
@@ -278,6 +275,8 @@ void check_files(const char *infile, const char *outfile)
 			else
 			{
 				perror(outfile);
+				close_file(infile, infile_des);
+				close_file(outfile, outfile_des);
 				exit(EX_NOINPUT);
 			}
 		}
@@ -287,21 +286,18 @@ void check_files(const char *infile, const char *outfile)
 		{
 			if (S_ISDIR(outfile_stat.st_mode))
 			{
-				fprintf(stderr, "%s: is a directory\n", outfile);
+				fprintf(stderr, "%s is a directory\n", outfile);
+				close_file(infile, infile_des);
+				close_file(outfile, outfile_des);
 				exit(EX_USAGE);
 			}
 			else
 			{
-				fprintf(stderr, "%s: is a block or character special\n", outfile);
+				fprintf(stderr, "%s is a block or character special\n", outfile);
+				close_file(infile, infile_des);
+				close_file(outfile, outfile_des);
 				exit(EX_USAGE);
 			}
-		}
-
-		/* Don't have write permission to outfile so exit */
-		if ((outfile_stat.st_mode & S_IWUSR) != S_IWUSR)
-		{
-			fprintf(stderr, "%s: Permission denied\n", outfile);
-			exit(EX_CANTCREAT);
 		}
 	}
 
@@ -312,21 +308,27 @@ void check_files(const char *infile, const char *outfile)
 		(infile_stat.st_ino == outfile_stat.st_ino))
 	{
 		fprintf(stderr, "Error: %s and %s are the same file\n", infile, outfile);
+		close_file(infile, infile_des);
+		close_file(outfile, outfile_des);
 		exit(EX_USAGE);
 	}
 	/* check if file system has enough space */
 	if (strcmp(infile, "-") != 0 && strcmp(outfile, "-") != 0)
 	{
 		struct statvfs fsinfo;
-		if (statvfs(outfile, &fsinfo) < 0)
+		if (fstatvfs(outfile_des, &fsinfo) < 0)
 		{
 			perror(outfile);
+			close_file(infile, infile_des);
+			close_file(outfile, outfile_des);
 			exit(EX_NOINPUT);
 		}
 		long free_space = fsinfo.f_bsize * fsinfo.f_bfree;
 		if (free_space < infile_stat.st_size)
 		{
 			fprintf(stderr, "Not enough free space on file system\n");
+			close_file(infile, infile_des);
+			close_file(outfile, outfile_des);
 			exit(EX_CANTCREAT);
 		}
 	}
@@ -390,6 +392,7 @@ void encdec_file(const char *infile, const char *outfile, char *password, const 
 	int outfile_des;
 	/* Try to open both files and check for errors */
 	open_files(infile, outfile, &infile_des, &outfile_des);
+	check_files(infile, infile_des, outfile, outfile_des);
 
 
 	/* Get the page size */
@@ -469,8 +472,8 @@ void encdec_file(const char *infile, const char *outfile, char *password, const 
 	}
 
 	/* Cleanup */
-	free(input_buffer);
 	free(output_buffer);
+	free(input_buffer);
 	close_file(infile, infile_des);
 	close_file(outfile, outfile_des);
 }
